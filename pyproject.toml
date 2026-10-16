@@ -1,0 +1,19 @@
+[project]
+name = "wxvd"
+version = "0.1.0"
+description = "WeChat Channels (视频号) video capture + decrypt"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+capture = ["mitmproxy>=10"]
+
+[project.scripts]
+wxvd = "wxvd.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

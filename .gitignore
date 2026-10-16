@@ -1,0 +1,6 @@
+.venv/
+__pycache__/
+captures.jsonl
+*.mp4
+data/
+.pytest_cache/

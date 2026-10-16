@@ -1,0 +1,13 @@
+#!/usr/bin/with-contenv bash
+# Keep the machine-id stable across rebuilds so WeChat sees the same device
+# (fewer re-logins / phone confirmations). Persisted on the /config volume.
+set -euo pipefail
+
+ID_FILE=/config/.wxvd/machine-id
+mkdir -p "$(dirname "$ID_FILE")"
+if [ ! -s "$ID_FILE" ]; then
+    tr -d '-' < /proc/sys/kernel/random/uuid > "$ID_FILE"
+fi
+cp "$ID_FILE" /etc/machine-id
+mkdir -p /var/lib/dbus
+cp "$ID_FILE" /var/lib/dbus/machine-id

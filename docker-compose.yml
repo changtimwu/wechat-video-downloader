@@ -1,0 +1,22 @@
+services:
+  wxvd:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: wxvd
+    hostname: wxvd          # stable, part of the device identity WeChat sees
+    cap_add:
+      - NET_ADMIN           # iptables inside the container's own netns only
+    security_opt:
+      - seccomp=unconfined  # Chromium-based WeChatAppEx sandbox
+    shm_size: 1gb
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Asia/Taipei
+      - TITLE=wxvd
+    volumes:
+      - ./data:/config      # WeChat login state, CA, captures.jsonl
+    ports:
+      - 127.0.0.1:3000:3000 # desktop in the browser; localhost only (no auth)
+    restart: unless-stopped

@@ -1,0 +1,11 @@
+#!/usr/bin/with-contenv bash
+# Long-running transparent mitmproxy with the wxvd capture addon.
+exec s6-setuidgid mitm /opt/wxvd/bin/mitmdump \
+    --mode transparent \
+    --listen-port 8080 \
+    --showhost \
+    --set confdir=/config/.wxvd/mitmproxy \
+    --allow-hosts '^channels\.weixin\.qq\.com(:443)?$' \
+    -s /opt/wxvd/capture.py \
+    --set wxvd_out=/config/wxvd/captures.jsonl \
+    --flow-detail 0

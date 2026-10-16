@@ -1,0 +1,49 @@
+#!/usr/bin/with-contenv bash
+# Container-local MITM setup: CA trust + iptables redirect. Nothing here
+# touches the host; iptables runs in the container's own network namespace.
+set -euo pipefail
+
+CONFDIR=/config/.wxvd/mitmproxy
+OUTDIR=/config/wxvd
+CA=$CONFDIR/mitmproxy-ca-cert.pem
+NICK=wxvd-mitmproxy
+
+mkdir -p "$CONFDIR" "$OUTDIR"
+chown mitm:mitm "$CONFDIR" "$OUTDIR"
+chmod 755 "$OUTDIR"
+
+# 1. CA, generated once and persisted so trust survives restarts.
+if [ ! -s "$CA" ]; then
+    s6-setuidgid mitm /opt/wxvd/bin/python -c \
+        "from mitmproxy.certs import CertStore; CertStore.from_store('$CONFDIR', 'mitmproxy', 2048)"
+fi
+
+# 2. Trust it in the container: system bundle + NSS dbs (Chromium/WeChatAppEx).
+cp "$CA" /usr/local/share/ca-certificates/$NICK.crt
+update-ca-certificates >/dev/null
+
+add_nss() {  # $1 = db dir, $2 = owner
+    mkdir -p "$1"
+    [ -f "$1/cert9.db" ] || certutil -d "sql:$1" -N --empty-password
+    certutil -d "sql:$1" -D -n "$NICK" >/dev/null 2>&1 || true
+    certutil -d "sql:$1" -A -n "$NICK" -t "C,," -i "$CA"
+    chown -R "$2" "$1"
+}
+add_nss /etc/pki/nssdb root:root
+add_nss /config/.pki/nssdb abc:abc
+
+# 3. Send everyone's outbound TCP 443 (except mitmproxy itself) to mitmproxy.
+#    mitmproxy only decrypts channels.weixin.qq.com (--allow-hosts); all other
+#    connections, including WeChat's own mmtls traffic, are passed through raw.
+MITM_UID=$(id -u mitm)
+iptables -t nat -N WXVD 2>/dev/null || iptables -t nat -F WXVD
+iptables -t nat -A WXVD -m owner --uid-owner "$MITM_UID" -j RETURN
+iptables -t nat -A WXVD -d 127.0.0.0/8 -j RETURN
+iptables -t nat -A WXVD -p tcp --dport 443 -j REDIRECT --to-ports 8080
+iptables -t nat -C OUTPUT -j WXVD 2>/dev/null || iptables -t nat -A OUTPUT -j WXVD
+
+# Block QUIC so the Channels page falls back to TCP (which we can see).
+iptables -C OUTPUT -p udp --dport 443 -j REJECT 2>/dev/null \
+    || iptables -A OUTPUT -p udp --dport 443 -j REJECT
+
+echo "[wxvd] CA installed, iptables redirect 443 -> 8080 active"

@@ -1,0 +1,5 @@
+[Desktop Entry]
+Type=Application
+Name=WeChat
+Exec=/usr/bin/wechat
+X-GNOME-Autostart-enabled=true
